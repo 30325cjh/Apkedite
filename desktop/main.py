@@ -215,11 +215,14 @@ class ApkEditor(QMainWindow):
     def install_and_launch(self):
         if not self.apk_path:
             return
-        candidate = self.last_build_path if self.last_build_path and self.last_build_path.exists() else self.apk_path
-        if candidate == self.last_build_path:
-            QMessageBox.information(self, "Signing required",
-                                    "The rebuilt APK is unsigned. Sign it with Android SDK apksigner before installing. The original APK will not be substituted silently.")
-            return
+        candidate = self.apk_path
+        if self.last_build_path and self.last_build_path.exists():
+            selected, _ = QFileDialog.getOpenFileName(
+                self, "Choose signed APK to install",
+                str(self.last_build_path.parent), "Android packages (*.apk)")
+            if not selected:
+                return
+            candidate = Path(selected)
         confirm = QMessageBox.question(
             self, "Install test APK",
             f"Install {candidate.name} on the connected test device? Continue only if you are authorized to modify it.")
@@ -227,9 +230,15 @@ class ApkEditor(QMainWindow):
             return
         try:
             self.adb("install", "-r", str(candidate))
-            QMessageBox.information(self, "Installed",
-                                    "APK installed. Open it on the test device, then use Refresh device screenshot.")
-            self.status.setText("APK installed on connected device")
+            if self.package_name:
+                self.adb("shell", "monkey", "-p", self.package_name,
+                         "-c", "android.intent.category.LAUNCHER", "1")
+                self.status.setText(f"Installed and launched {self.package_name}")
+                self.capture_screenshot()
+            else:
+                QMessageBox.information(self, "Installed",
+                                        "APK installed. Open it manually on the connected test device, then refresh the screenshot.")
+                self.status.setText("APK installed on connected device")
         except Exception as exc:
             QMessageBox.warning(self, "ADB action", str(exc))
 
