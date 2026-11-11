@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+.idea/
+.gradle/
+local.properties
+build/
+dist/
+*.apk
+*.aab
+.DS_Store
