@@ -4,7 +4,7 @@ A dual-platform APK resource editor.
 
 ## Product direction
 - Desktop: inspect APK archives, edit text/XML resources, rebuild authorized APKs with Apktool, install/launch them on an Android emulator/device with ADB, and capture screenshots for visual verification.
-- Android: inspect APK contents on-device, edit text/XML resources, preview image assets, and export a portable patch project. Full APK rebuilding is initially a desktop workflow.
+- Android: inspect APK archives on-device, search entries, edit text/XML resources, and export a portable JSON patch project. Image rendering and full APK rebuilding are follow-up milestones.
 
 Only edit APKs you own or are authorized to modify. No process-memory editing, injection, security bypasses, or tampering with another running app's private data.
 
