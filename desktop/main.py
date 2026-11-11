@@ -31,6 +31,7 @@ class ApkEditor(QMainWindow):
         self.dirty: dict[str, str] = {}
         self.package_name: str | None = None
         self.last_build_path: Path | None = None
+        self.decoded_dir: Path | None = None
         self._build_ui()
 
     def _build_ui(self):
@@ -84,20 +85,35 @@ class ApkEditor(QMainWindow):
         if not path:
             return
         try:
-            with zipfile.ZipFile(path) as archive:
-                bad = archive.testzip()
-                if bad:
-                    raise ValueError(f"Archive integrity check failed: {bad}")
-                entries = [n for n in archive.namelist()
-                           if not n.endswith("/") and not n.startswith("../") and "/../" not in n]
             if self.work_dir:
                 shutil.rmtree(self.work_dir, ignore_errors=True)
             self.work_dir = Path(tempfile.mkdtemp(prefix="apkedite_"))
             self.apk_path = Path(path)
             self.dirty.clear()
+            self.last_build_path = None
+            self.decoded_dir = None
+            entries = []
+            if shutil.which("apktool"):
+                decoded = self.work_dir / "decoded"
+                try:
+                    subprocess.run(["apktool", "d", "-f", str(self.apk_path), "-o", str(decoded)],
+                                   check=True, capture_output=True, text=True)
+                    self.decoded_dir = decoded
+                    entries = [p.relative_to(decoded).as_posix() for p in decoded.rglob("*") if p.is_file()]
+                    self.status.setText("Decoded with Apktool. XML resources are editable source files.")
+                except subprocess.CalledProcessError as exc:
+                    self.status.setText("Apktool decode failed; showing raw archive (compiled XML is not editable).")
+            if not entries:
+                with zipfile.ZipFile(path) as archive:
+                    bad = archive.testzip()
+                    if bad:
+                        raise ValueError(f"Archive integrity check failed: {bad}")
+                    entries = [n for n in archive.namelist()
+                               if not n.endswith("/") and not n.startswith("../") and "/../" not in n]
             self.file_list.clear()
             self.file_list.addItems(sorted(entries))
-            self.status.setText(f"{self.apk_path.name} | {len(entries)} entries")
+            self.status.setText(f"{self.apk_path.name} | {len(entries)} entries" +
+                                (" | decoded workspace" if self.decoded_dir else " | raw archive view"))
             self.editor.clear()
             self.preview.setText("Select a resource to preview")
         except Exception as exc:
@@ -115,15 +131,19 @@ class ApkEditor(QMainWindow):
         name = current.text()
         self.current_entry = name
         try:
-            with zipfile.ZipFile(self.apk_path) as archive:
-                data = archive.read(name)
+            source = (self.decoded_dir / name) if self.decoded_dir else None
+            if source and source.is_file():
+                data = source.read_bytes()
+            else:
+                with zipfile.ZipFile(self.apk_path) as archive:
+                    data = archive.read(name)
             suffix = Path(name).suffix.lower()
             if suffix in IMAGE_SUFFIXES:
                 pix = QPixmap()
                 pix.loadFromData(data)
                 self.preview.setPixmap(pix.scaled(self.preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
                 self.editor.setReadOnly(True)
-                self.editor.setPlainText("Image asset selected. Visual replacement is planned for the next milestone.")
+                self.editor.setPlainText("Image asset selected. Image replacement is planned for the next milestone.")
             elif suffix in TEXT_SUFFIXES and len(data) <= MAX_TEXT_BYTES:
                 self.preview.setText(f"Text resource | {len(data):,} bytes")
                 self.editor.setReadOnly(False)
@@ -131,7 +151,8 @@ class ApkEditor(QMainWindow):
             else:
                 self.preview.setText(f"Binary resource | {len(data):,} bytes")
                 self.editor.setReadOnly(True)
-                self.editor.setPlainText("This file is not an editable text resource in this milestone.")
+                note = "Install Apktool to decode compiled Android XML before editing." if suffix == ".xml" and not self.decoded_dir else "This file is not an editable text resource in this milestone."
+                self.editor.setPlainText(note)
         except Exception as exc:
             QMessageBox.warning(self, "Read failed", str(exc))
 
@@ -152,10 +173,12 @@ class ApkEditor(QMainWindow):
         if not shutil.which("apktool"):
             QMessageBox.warning(self, "Apktool not found", "Install Apktool and add it to PATH: https://apktool.org/")
             return
-        out_dir = self.work_dir / "decoded"
         try:
-            subprocess.run(["apktool", "d", "-f", str(self.apk_path), "-o", str(out_dir)],
-                           check=True, capture_output=True, text=True)
+            out_dir = self.decoded_dir or (self.work_dir / "decoded")
+            if self.decoded_dir is None:
+                subprocess.run(["apktool", "d", "-f", str(self.apk_path), "-o", str(out_dir)],
+                               check=True, capture_output=True, text=True)
+                self.decoded_dir = out_dir
             for relative, content in self.dirty.items():
                 target = (out_dir / relative).resolve()
                 if out_dir.resolve() not in target.parents:
@@ -171,8 +194,13 @@ class ApkEditor(QMainWindow):
             subprocess.run(["apktool", "b", str(out_dir), "-o", output],
                            check=True, capture_output=True, text=True)
             self.last_build_path = Path(output)
+            manifest = out_dir / "AndroidManifest.xml"
+            if manifest.exists():
+                import re
+                match = re.search(r'package="([^"]+)"', manifest.read_text(encoding="utf-8", errors="ignore"))
+                self.package_name = match.group(1) if match else None
             QMessageBox.information(self, "Build complete",
-                                    f"Unsigned APK created:\n{output}\n\nIt must be signed before Android will install it.")
+                                    f"Unsigned APK created:\n{output}\n\nSign it with Android SDK apksigner before installation.")
             self.status.setText(f"Build complete: {output}")
         except subprocess.CalledProcessError as exc:
             QMessageBox.critical(self, "Build failed", (exc.stderr or exc.stdout or str(exc))[-5000:])
