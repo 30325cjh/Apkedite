@@ -19,4 +19,4 @@ Only edit APKs you own or are authorized to modify. No process-memory editing, i
 Open android/ in Android Studio and build the app module.
 
 ## Milestone 0.1
-Initial scaffold. Desktop supports archive browsing, text/XML edits, Apktool rebuild integration, and ADB install/launch/screenshot actions. Android supports on-device archive browsing and text/XML editing; patch export and richer image/layout preview are follow-up milestones.
+Initial scaffold. Desktop supports archive browsing, text/XML edits, Apktool rebuild integration, and ADB install/launch/screenshot actions. Android supports on-device archive browsing, file search, text/XML editing, and JSON patch export. Image rendering and richer layout preview are follow-up milestones.
