@@ -30,6 +30,7 @@ class ApkEditor(QMainWindow):
         self.current_entry: str | None = None
         self.dirty: dict[str, str] = {}
         self.package_name: str | None = None
+        self.last_build_path: Path | None = None
         self._build_ui()
 
     def _build_ui(self):
@@ -169,8 +170,9 @@ class ApkEditor(QMainWindow):
                 return
             subprocess.run(["apktool", "b", str(out_dir), "-o", output],
                            check=True, capture_output=True, text=True)
+            self.last_build_path = Path(output)
             QMessageBox.information(self, "Build complete",
-                                    f"Unsigned APK created:\n{output}\n\nSign it with your own test key before installation.")
+                                    f"Unsigned APK created:\n{output}\n\nIt must be signed before Android will install it.")
             self.status.setText(f"Build complete: {output}")
         except subprocess.CalledProcessError as exc:
             QMessageBox.critical(self, "Build failed", (exc.stderr or exc.stdout or str(exc))[-5000:])
@@ -185,7 +187,11 @@ class ApkEditor(QMainWindow):
     def install_and_launch(self):
         if not self.apk_path:
             return
-        candidate = self.apk_path
+        candidate = self.last_build_path if self.last_build_path and self.last_build_path.exists() else self.apk_path
+        if candidate == self.last_build_path:
+            QMessageBox.information(self, "Signing required",
+                                    "The rebuilt APK is unsigned. Sign it with Android SDK apksigner before installing. The original APK will not be substituted silently.")
+            return
         confirm = QMessageBox.question(
             self, "Install test APK",
             f"Install {candidate.name} on the connected test device? Continue only if you are authorized to modify it.")
