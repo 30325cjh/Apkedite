@@ -67,7 +67,7 @@ private fun ApkEditorScreen() {
             found.sorted()
         }
         loading = false
-        info = "Loaded \${entries.size} archive entries. Select a text resource."
+        info = "Loaded ${entries.size} archive entries. Select a text resource."
     }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
@@ -123,7 +123,7 @@ private fun ApkEditorScreen() {
             if (name != null && name.substringAfterLast('.', "").lowercase() in
                 listOf("xml", "txt", "json", "html", "css", "js", "properties")) {
                 edits = edits + (name to editorText)
-                info = "Saved in workspace: \${edits.size} edited resource(s)"
+                info = "Saved in workspace: ${edits.size} edited resource(s)"
             }
         }) { Text("Save edit") }
         Text("This Android milestone edits a workspace copy; APK rebuilding/export will be added next.",
