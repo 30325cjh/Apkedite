@@ -40,6 +40,14 @@ private fun ApkEditorScreen() {
     var loading by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("Choose an APK to inspect its archive.") }
 
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) {
+            val payload = org.json.JSONObject(edits).toString(2)
+            context.contentResolver.openOutputStream(uri)?.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
+            info = "Patch project exported."
+        }
+    }
+
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -118,15 +126,20 @@ private fun ApkEditorScreen() {
                 label = { Text(selected ?: "Text resource") }
             )
         }
-        Button(onClick = {
-            val name = selected
-            if (name != null && name.substringAfterLast('.', "").lowercase() in
-                listOf("xml", "txt", "json", "html", "css", "js", "properties")) {
-                edits = edits + (name to editorText)
-                info = "Saved in workspace: ${edits.size} edited resource(s)"
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                val name = selected
+                if (name != null && name.substringAfterLast('.', "").lowercase() in
+                    listOf("xml", "txt", "json", "html", "css", "js", "properties")) {
+                    edits = edits + (name to editorText)
+                    info = "Saved in workspace: ${edits.size} edited resource(s)"
+                }
+            }) { Text("Save edit") }
+            OutlinedButton(onClick = { exportLauncher.launch("Apkedite-patch.json") }) {
+                Text("Export patch")
             }
-        }) { Text("Save edit") }
-        Text("This Android milestone edits a workspace copy; APK rebuilding/export will be added next.",
+        }
+        Text("Exported patch JSON can be used as a portable edit record. Rebuilding the APK is a desktop workflow in this milestone.",
             style = MaterialTheme.typography.bodySmall)
     }
 }
