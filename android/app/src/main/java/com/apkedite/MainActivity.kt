@@ -36,6 +36,7 @@ private fun ApkEditorScreen() {
     var entries by remember { mutableStateOf(listOf<String>()) }
     var selected by remember { mutableStateOf<String?>(null) }
     var editorText by remember { mutableStateOf("") }
+    var query by remember { mutableStateOf("") }
     var edits by remember { mutableStateOf(mapOf<String, String>()) }
     var loading by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf("Choose an APK to inspect its archive.") }
@@ -86,11 +87,12 @@ private fun ApkEditorScreen() {
             Text("Choose APK")
         }
         Text(apkName, style = MaterialTheme.typography.labelLarge)
+        OutlinedTextField(value = query, onValueChange = { query = it }, label = { Text("Search files") }, modifier = Modifier.fillMaxWidth())
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         Text(info, Modifier.padding(vertical = 8.dp))
         Row(Modifier.weight(1f)) {
             LazyColumn(Modifier.weight(1f)) {
-                items(entries) { name ->
+                items(entries.filter { it.contains(query, ignoreCase = true) }) { name ->
                     Text(name, Modifier.fillMaxWidth().clickable {
                         selected = name
                         val ext = name.substringAfterLast('.', "").lowercase()
